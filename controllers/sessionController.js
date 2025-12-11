@@ -70,7 +70,9 @@ const startSession = async (req, res) => {
             qrCode,
             isActive: true,
             routineId: routine._id,
-            periodNo: routine.timetable.periods.periodNo // Save period number
+            periodNo: routine.timetable.periods.periodNo,
+            semester: routine.semester, // Persist semester
+            dept: routine.dept // Persist dept
         });
 
         res.status(201).json(session);
@@ -183,6 +185,7 @@ const endSession = async (req, res) => {
             endTime: Date.now(),
             bssid: session.bssid,
             ssid: session.ssid,
+            semester: session.semester, // Pass semester from session
             presentCount: presentStudentIds.length,
             absentCount: finalAbsentCount
         });
@@ -195,6 +198,7 @@ const endSession = async (req, res) => {
             history
         });
     } catch (error) {
+        console.error('End Session Failed:', error);
         res.status(500).json({ message: error.message });
     }
 };
