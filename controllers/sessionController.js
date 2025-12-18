@@ -215,4 +215,31 @@ const getActiveSession = async (req, res) => {
     }
 };
 
-module.exports = { startSession, endSession, getActiveSession };
+// @desc    Refresh QR Code (Dynamic QR)
+// @route   POST /api/sessions/refresh-qr
+// @access  Teacher
+const refreshQrCode = async (req, res) => {
+    const { sessionId } = req.body;
+
+    try {
+        const session = await Session.findById(sessionId);
+        if (!session) {
+            return res.status(404).json({ message: 'Session not found' });
+        }
+
+        if (session.teacher.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'Not authorized' });
+        }
+
+        // Generate new QR Token
+        const newQrCode = crypto.randomBytes(16).toString('hex');
+        session.qrCode = newQrCode;
+        await session.save();
+
+        res.json({ qrCode: newQrCode });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { startSession, endSession, getActiveSession, refreshQrCode };

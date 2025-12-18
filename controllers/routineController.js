@@ -145,4 +145,42 @@ const getStudentTimetable = async (req, res) => {
     }
 };
 
-module.exports = { getTeacherRoutines, getTeacherTimetable, getStudentTimetable };
+const getTeacherClasses = async (req, res) => {
+    try {
+        const classes = await ClassRoutine.aggregate([
+            { $unwind: "$timetable" },
+            { $unwind: "$timetable.periods" },
+            {
+                $match: {
+                    "timetable.periods.teacher": new mongoose.Types.ObjectId(req.user._id)
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        dept: "$dept",
+                        semester: "$semester",
+                        subject: "$timetable.periods.subject",
+                        batch: "$batch"
+                    }
+                }
+            },
+            {
+                $project: {
+                    _id: 0,
+                    dept: "$_id.dept",
+                    semester: "$_id.semester",
+                    subject: "$_id.subject",
+                    batch: "$_id.batch"
+                }
+            },
+            { $sort: { semester: 1, subject: 1 } }
+        ]);
+
+        res.json(classes);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { getTeacherRoutines, getTeacherTimetable, getStudentTimetable, getTeacherClasses };

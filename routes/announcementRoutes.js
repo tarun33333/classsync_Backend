@@ -1,11 +1,26 @@
 const express = require('express');
 const router = express.Router();
 const Announcement = require('../models/Announcement');
+const { protect } = require('../middlewares/authMiddleware');
 
-// GET all announcements (sorted by newest first)
-router.get('/', async (req, res) => {
+// GET all announcements (filtered by student profile)
+router.get('/', protect, async (req, res) => {
     try {
-        const announcements = await Announcement.find().sort({ date: -1 });
+        let query = {};
+
+        // If Student, filter by targeting
+        if (req.user.role === 'student') {
+            query = {
+                $and: [
+                    { $or: [{ targetDept: null }, { targetDept: req.user.department }] },
+                    { $or: [{ targetSemester: null }, { targetSemester: req.user.currentSemester }] },
+                    // Section is optional in targeting, but if set, must match
+                    { $or: [{ targetSection: null }, { targetSection: req.user.section }] }
+                ]
+            };
+        }
+
+        const announcements = await Announcement.find(query).sort({ date: -1 });
         res.json(announcements);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -13,14 +28,19 @@ router.get('/', async (req, res) => {
 });
 
 // POST create a new announcement
-router.post('/create', async (req, res) => {
-    const { title, message, authorName, authorRole } = req.body;
+router.post('/create', protect, async (req, res) => {
+    const { title, message, authorName, authorRole, targetDept, targetSemester, targetSection, targetSubject } = req.body;
 
     const newAnnouncement = new Announcement({
         title,
         message,
         authorName,
-        authorRole
+        authorRole,
+        teacherId: req.user._id, // Link to creator
+        targetDept,
+        targetSemester,
+        targetSection,
+        targetSubject
     });
 
     try {

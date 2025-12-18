@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const periodSchema = new mongoose.Schema({
-    periodNo: { type: Number, min: 1, max: 6, required: true },
+    periodNo: { type: Number, min: 1, max: 8, required: true },
     startTime: { type: String, required: true }, // e.g., "09:00"
     endTime: { type: String, required: true },   // e.g., "09:50"
     subject: { type: String, required: true },
@@ -16,12 +16,13 @@ const dayScheduleSchema = new mongoose.Schema({
     },
     periods: {
         type: [periodSchema],
-        validate: [arrayLimit, '{PATH} exceeds the limit of 6']
+        validate: [arrayLimit, '{PATH} exceeds the limit of 8'],
+        required: true
     }
 }, { _id: false });
 
 function arrayLimit(val) {
-    return val.length <= 6;
+    return val.length <= 8;
 }
 
 const classRoutineSchema = new mongoose.Schema({

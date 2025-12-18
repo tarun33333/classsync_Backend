@@ -462,4 +462,83 @@ const getFilteredReports = async (req, res) => {
     }
 };
 
-module.exports = { verifyWifi, markAttendance, getSessionAttendance, getStudentHistory, getStudentDashboard, getStudentStats, getTeacherReports, getFilteredReports };
+const getAttendanceReport = async (req, res) => {
+    const { startDate, endDate, dept, semester, subject, section } = req.body;
+
+    try {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+
+        // 1. Find all Sessions (Active + History) in range
+        const query = {
+            startTime: { $gte: start, $lte: end },
+            subject: subject,
+            // We use the teacher's department usually, or the explicit one passed
+            // The session/history usually stores section. Dept is implicit from teacher.
+        };
+
+        if (section) query.section = section;
+
+        // Need to check both Session (Active) and ClassHistory (Archived)
+        const Session = require('../models/Session');
+        const ClassHistory = require('../models/ClassHistory');
+        const User = require('../models/User');
+
+        const activeSessions = await Session.find(query).select('_id startTime section');
+        const historySessions = await ClassHistory.find(query).select('_id startTime section');
+
+        const allSessionIds = [...activeSessions, ...historySessions].map(s => s._id);
+        const totalClasses = allSessionIds.length;
+
+        // 2. Fetch all Students in this class
+        const students = await User.find({
+            role: 'student',
+            department: dept, // Ensure we filter by passed dept
+            currentSemester: semester, // and semester
+            section: section // and section
+        }).select('_id name rollNumber');
+
+        // 3. For each student, calculate presence
+        const report = await Promise.all(students.map(async (student) => {
+            const presentCount = await Attendance.countDocuments({
+                student: student._id,
+                session: { $in: allSessionIds },
+                status: 'present'
+            });
+
+            const percentage = totalClasses > 0 ? ((presentCount / totalClasses) * 100).toFixed(1) : 0;
+
+            return {
+                studentId: student._id,
+                name: student.name,
+                rollNumber: student.rollNumber,
+                present: presentCount,
+                total: totalClasses,
+                percentage: parseFloat(percentage)
+            };
+        }));
+
+        res.json({
+            range: { start, end },
+            totalClasses,
+            report
+        });
+
+    } catch (error) {
+        console.error('Report Error:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = {
+    verifyWifi,
+    markAttendance,
+    getSessionAttendance,
+    getStudentHistory,
+    getStudentDashboard,
+    getStudentStats,
+    getTeacherReports,
+    getFilteredReports,
+    getAttendanceReport
+};

@@ -4,6 +4,7 @@ const User = require('../models/User');
 const ClassRoutine = require('../models/ClassRoutine');
 const Session = require('../models/Session');
 const Attendance = require('../models/Attendance');
+const ClassHistory = require('../models/ClassHistory');
 
 // Connect to DB
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/classsync')
@@ -18,6 +19,7 @@ const seedCheckData = async () => {
         await ClassRoutine.deleteMany({});
         await Session.deleteMany({});
         await Attendance.deleteMany({});
+        await ClassHistory.deleteMany({});
 
         // --- Create Teacher ---
         console.log('Creating Teacher...');
@@ -58,6 +60,72 @@ const seedCheckData = async () => {
             batch: '2022-2026'
         });
 
+        const students = [student1, student2];
+
+        // --- Create History for Sem 1 & 2 ---
+        console.log('Creating Historical Attendance (Sem 1 & 2)...');
+
+        const createHistoryForSemester = async (sem, startDate, numDays) => {
+            const date = new Date(startDate);
+            for (let i = 0; i < numDays; i++) {
+                // Create 2 sessions per day
+                for (let j = 0; j < 2; j++) {
+                    const sessionID = new mongoose.Types.ObjectId();
+                    const startTime = new Date(date);
+                    startTime.setHours(9 + j, 0, 0); // 9:00, 10:00
+                    const endTime = new Date(startTime);
+                    endTime.setHours(10 + j, 0, 0);
+
+                    // Randomize attendance
+                    let presentCount = 0;
+                    let absentCount = 0;
+
+                    for (const student of students) {
+                        const isPresent = Math.random() > 0.2; // 80% attendance
+                        if (isPresent) presentCount++; else absentCount++;
+
+                        await Attendance.create({
+                            session: sessionID,
+                            student: student._id,
+                            status: isPresent ? 'present' : 'absent',
+                            method: 'manual',
+                            verified: true,
+                            timestamp: startTime
+                        });
+                    }
+
+                    await ClassHistory.create({
+                        _id: sessionID,
+                        teacher: teacher._id,
+                        subject: `Subject ${j + 1} (Sem ${sem})`,
+                        section: 'A',
+                        semester: sem,
+                        startTime: startTime,
+                        endTime: endTime,
+                        presentCount,
+                        absentCount
+                    });
+                }
+                date.setDate(date.getDate() + 1); // Next day
+            }
+        };
+
+        // Sem 1: 1 Year ago, 10 days of data
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+        await createHistoryForSemester(1, oneYearAgo, 10);
+
+        // Sem 2: 6 Months ago, 10 days of data
+        const sixMonthsAgo = new Date();
+        sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+        await createHistoryForSemester(2, sixMonthsAgo, 10);
+
+        // Sem 3: Recent data (Current Month) - Last 15 days
+        const fifteenDaysAgo = new Date();
+        fifteenDaysAgo.setDate(fifteenDaysAgo.getDate() - 15);
+        await createHistoryForSemester(3, fifteenDaysAgo, 15);
+
+
         // --- Create Class Routine for Today ---
         console.log('Creating Class Routine...');
 
@@ -91,7 +159,7 @@ const seedCheckData = async () => {
         await ClassRoutine.create({
             dept: 'CSE',
             batch: '2022-2026',
-            semester: 3,
+            semester: 3, // Current semester
             class: 2,
             timetable
         });
@@ -102,6 +170,7 @@ const seedCheckData = async () => {
         console.log('Teacher: teacher@test.com / 111');
         console.log('Student 1: student1@test.com / 111');
         console.log('Student 2: student2@test.com / 111');
+        console.log('Added 20 historical sessions for Sem 1 and Sem 2');
         console.log('------------------------------------------------');
 
         process.exit();

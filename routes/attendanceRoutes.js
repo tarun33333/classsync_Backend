@@ -8,7 +8,8 @@ const {
     getStudentDashboard,
     getStudentStats,
     getTeacherReports,
-    getFilteredReports
+    getFilteredReports,
+    getAttendanceReport
 } = require('../controllers/attendanceController');
 const { protect, teacherOnly } = require('../middlewares/authMiddleware');
 
@@ -17,6 +18,7 @@ router.post('/mark', protect, markAttendance);
 router.get('/session/:sessionId', protect, teacherOnly, getSessionAttendance);
 router.get('/reports', protect, teacherOnly, getTeacherReports);
 router.get('/reports/filter', protect, teacherOnly, getFilteredReports); // New Route
+router.post('/report/generate', protect, teacherOnly, getAttendanceReport);
 router.get('/student', protect, getStudentHistory);
 router.get('/dashboard', protect, getStudentDashboard);
 router.get('/stats', protect, getStudentStats);
